@@ -1,0 +1,26 @@
+accelerate launch --config_file accelerate_config.yaml flux_lora_finetune_new.py \
+  --pretrained_model_name_or_path="black-forest-labs/FLUX.1-Canny-dev" \
+  --local_dataset_name="/root/Homeworks/NLP/FLUX_SR/datasets/DIV2K_train_dataset_x4_withprompt" \
+  --output_dir="/root/Homeworks/NLP/FLUX_SR/results/train_with_prompt_x4" \
+  --mixed_precision="bf16" \
+  --train_batch_size=1 \
+  --rank=16 \
+  --gradient_accumulation_steps=16 \
+  --gradient_checkpointing \
+  --learning_rate=1e-3 \
+  --report_to="wandb" \
+  --lr_scheduler="constant" \
+  --lr_warmup_steps=60 \
+  --max_train_steps=1250 \
+  --checkpointing_steps=100 \
+  --validation_image="/root/Homeworks/NLP/FLUX_SR/datasets/DIV2K_valid_LR_x4" \
+  --validation_prompt="/root/Homeworks/NLP/FLUX_SR/datasets/DIV2K_valid_prompt_short" \
+  --gt_image="/root/Homeworks/NLP/FLUX_SR/datasets/DIV2K_valid_HR" \
+  --valid_GPU_id="cuda:3" \
+  --validation_steps=10000 \
+  --offload\
+  --seed="42" \
+  --hub_token=""\
+  --proportion_empty_prompts=0.0\
+  --tracker_project_name="train_with_prompt_x4" \
+  --use_8bit_adam
