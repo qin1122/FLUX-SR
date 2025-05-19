@@ -36,8 +36,9 @@ def load_validation_set(image_dir, prompt_dir, gt_dir):
     return validation_images, validation_prompts, gt_images
 
 
-def test(lora_weight_path, image_dir, prompt_dir, gt_dir, output_dir):
+def test(lora_weight_path, image_dir, prompt_dir, gt_dir, output_dir, step):
     os.makedirs(output_dir, exist_ok=True)
+    lora_weight_path = os.path.join(lora_weight_path+'-'+str(step))
 
     pipe = FluxControlPipeline.from_pretrained(
         "black-forest-labs/FLUX.1-Canny-dev", torch_dtype=torch.bfloat16).to("cuda:3")
@@ -58,17 +59,6 @@ def test(lora_weight_path, image_dir, prompt_dir, gt_dir, output_dir):
         HR_image = Image.open(gt_image).convert("RGB")
         width, height = HR_image.size
         control_image = control_image.convert("RGB")
-        HR_image = HR_image.resize((1024, 1024), Image.BILINEAR)
-
-        image_cal = pipe(
-            prompt=validation_prompt,
-            control_image=control_image,
-            height=1024,
-            width=1024,
-            num_inference_steps=50,
-            guidance_scale=30.0,
-            generator=torch.Generator().manual_seed(42),
-        ).images[0]
 
         image_save = pipe(
             prompt=validation_prompt,
@@ -80,55 +70,21 @@ def test(lora_weight_path, image_dir, prompt_dir, gt_dir, output_dir):
             generator=torch.Generator().manual_seed(42),
         ).images[0]
 
-        save_dir = os.path.join(output_dir, "output"+base_name+".png")
+        H, W = image_save.size
+        HR_image = HR_image.resize((H, W), Image.BILINEAR)
+
+        save_dir = os.path.join(output_dir+"_"+str(step), "output_" +
+                                base_name+".png")
         image_save.save(save_dir)
 
-        psnr_5, psnr, ssim_ = calculate_psnr_ssim(image_cal, HR_image)
+        psnr_5, psnr, ssim_ = calculate_psnr_ssim(image_save, HR_image)
         accumulate_psnr += psnr
         accumulate_psnr_5 += psnr_5
-        accumulate_ssim += ssim
+        accumulate_ssim += ssim_
         total_num += 1
 
     print(f"average psnr: {accumulate_psnr/total_num}, average psnr_5: {accumulate_psnr_5/total_num}, average ssim: {accumulate_ssim/total_num}")
 
-
-# prompt = "A rockhopper penguin stands on rugged, dark gray rocks, slightly off-center to the left. Its yellow crest contrasts with its black and white body. The penguin's wings are slightly spread, and its pink feet are visible. The rocky background is textured with shades of gray and black, creating a natural habitat setting."
-# control_image = load_image(
-#     "/root/Homeworks/NLP/FLUX_SR/datasets/DIV2K_valid_LR_x4/0801.png")
-# HR_image = Image.open(
-#     "/root/Homeworks/NLP/FLUX_SR/datasets/DIV2K_valid_HR/0801.png").convert("RGB")
-
-# # image_transforms = transforms.Compose(
-# #     [
-# #         transforms.Resize((1024, 1024),
-# #                           interpolation=transforms.InterpolationMode.BILINEAR),
-# #         transforms.ToTensor(),
-# #         # transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-# #     ]
-# # )
-
-# # control_image = control_image.convert("RGB")
-# # control_image = image_transforms(control_image)
-# control_image = control_image.convert("RGB")
-
-# HR_image = HR_image.resize((1024, 1024), Image.BILINEAR)
-
-# image = pipe(
-#     prompt=prompt,
-#     control_image=control_image,
-#     # height=HR_image.size[1],
-#     # width=HR_image.size[0],
-#     height=1024,
-#     width=1024,
-#     num_inference_steps=50,
-#     guidance_scale=30.0,
-#     generator=torch.Generator().manual_seed(42),
-# ).images[0]
-# image.save("output_804_x4_800_onlypinkprompt.png")
-
-
-# psnr_5, psnr, ssim_ = calculate_psnr_ssim(image, HR_image)
-# print(psnr_5, psnr, ssim_)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -142,7 +98,9 @@ if __name__ == '__main__':
                         default='/root/Homeworks/NLP/FLUX_SR/datasets/DIV2K_valid_HR', help='Ground Truth HR image path')
     parser.add_argument('--output_dir', type=str,
                         default=None, help='Output estimated HR image save path')
+    parser.add_argument('--step', type=int, default=100,
+                        help='The step of checkpoint')
     args = parser.parse_args()
 
     test(args.lora_weight_dir, args.image_dir,
-         args.prompt_dir, args.gt_dir, args.output_dir)
+         args.prompt_dir, args.gt_dir, args.output_dir, args.step)
