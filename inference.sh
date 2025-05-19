@@ -9,7 +9,7 @@ OUTPUT_DIR="/root/Homeworks/NLP/FLUX_SR/results/train_with_prompt_x4/eval"
 STEP=100
 # OUTPUT_DIR="/root/Homeworks/NLP/FLUX_SR/results/train_with_prompt_x4/valid_200"
 
-python eval.py \
+python inference.py \
     --lora_weight_dir "$LORA_WEIGHT_DIR" \
     --image_dir "$IMAGE_DIR" \
     --prompt_dir "$PROMPT_DIR" \
