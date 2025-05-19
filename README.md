@@ -18,10 +18,10 @@
     pip install -r requirements.txt
     ```
 
-## Datasets
+## 🗂️ Datasets
 
 
-## Training FLUX_SR
+## ⚙️ Training FLUX_SR
 1. Log in to Hugging Face
 > **Gated model**
 >
@@ -81,7 +81,7 @@ huggingface-cli login
     ./test.sh  # Change the args as needed
     ```
 
-## Inference
+## ⚡️ Inference
 
 You can inference on your own image. Simply run:
 ```bash
