@@ -76,7 +76,7 @@ huggingface-cli login
     * `train_norm_layers`: When set, additionally trains the normalization scales. Takes care of saving and loading.
     * `lora_layers`: Specify the layers you want to apply LoRA to. If you specify "all-linear", all the linear layers will be LoRA-attached.
 
-5. Test on DIV2K valid dataset
+5. Test on DIV2K validation set
     ```bash
     ./test.sh  # Change the args as needed
     ```
