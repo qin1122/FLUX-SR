@@ -1,3 +1,5 @@
+# coding=utf-8
+
 import torch
 from diffusers import FluxControlPipeline, FluxTransformer2DModel
 from diffusers.utils import load_image
@@ -8,12 +10,12 @@ from glob import glob
 import argparse
 
 
-def eval(lora_weight_path, image_dir, prompt_dir, gt_dir, output_dir, step):
+def eval(lora_weight_path, image_dir, prompt_dir, gt_dir, output_dir, step, device):
     os.makedirs(output_dir, exist_ok=True)
     lora_weight_path = os.path.join(lora_weight_path+'-'+str(step))
 
     pipe = FluxControlPipeline.from_pretrained(
-        "black-forest-labs/FLUX.1-Canny-dev", torch_dtype=torch.bfloat16).to("cuda:3")
+        "black-forest-labs/FLUX.1-Canny-dev", torch_dtype=torch.bfloat16).to(device)
     pipe.load_lora_weights(lora_weight_path, adapter_name="resolution")
     pipe.set_adapters("resolution", 0.85)
 
@@ -44,12 +46,6 @@ def eval(lora_weight_path, image_dir, prompt_dir, gt_dir, output_dir, step):
                             base_name+"_"+str(step)+".png")
     image_save.save(save_dir)
 
-    psnr_5_big, psnr_big, ssim_big = calculate_psnr_ssim(
-        image_save, HR_image_save)
-
-    print(
-        f"origin size psnr_5: {psnr_5_big}, psnr: {psnr_big}, ssim: {ssim_big}\n")
-
 
 if __name__ == '__main__':
     """
@@ -68,7 +64,8 @@ if __name__ == '__main__':
                         default=None, help='Output estimated HR image save path')
     parser.add_argument('--step', type=int, default=100,
                         help='The step of checkpoint')
+    parser.add_argument('--device', type=str, default="cuda")
     args = parser.parse_args()
 
     eval(args.lora_weight_dir, args.image_dir,
-         args.prompt_dir, args.gt_dir, args.output_dir, args.step)
+         args.prompt_dir, args.gt_dir, args.output_dir, args.step, args.device)

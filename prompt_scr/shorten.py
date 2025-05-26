@@ -1,3 +1,5 @@
+# coding=utf-8
+
 import openai
 import base64
 import os
@@ -11,9 +13,9 @@ prompt_1 = "Please describe the components of this image and their positions wit
 prompt_new = "Please describe the details of the components of this image and their positions within the image. I want the answer to be used as a prompt.Require generating a piece of plain text without line breaks and the prompt's length must within 77 Tokens. "
 
 # 图片文件夹路径
-image_folder = "/root/image_reso/dataset/DIV2K_valid_HR"
-output_folder = "/root/image_reso/dataset/DIV2K_valid_prompt_short"
-error_path = "/root/image_reso/dataset/DIV2K_train_errors.txt"
+image_folder = "./datasets/DIV2K_valid_HR"
+output_folder = "./datasets/DIV2K_valid_prompt_short"
+error_path = "./datasets/DIV2K_train_errors.txt"
 os.makedirs(output_folder, exist_ok=True)
 
 

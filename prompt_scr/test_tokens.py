@@ -1,3 +1,5 @@
+# coding=utf-8
+
 import os
 import openai
 import base64
@@ -64,10 +66,10 @@ def generate_new_prompt(image_path, old_prompt):
 
 
 # 文件路径
-root_folder = "/root/image_reso/dataset/DIV2K_train_prompt_short"  # 替换为你的文本文件所在目录
-image_folder = "/root/image_reso/dataset/DIV2K_train_HR"
-output_log_path = "/root/image_reso/dataset/DIV2K_train_need_to_short.txt"
-error_path = "/root/image_reso/dataset/error.txt"
+root_folder = "./datasets/DIV2K_train_prompt_short"  # 替换为你的文本文件所在目录
+image_folder = "./datasets/DIV2K_train_HR"
+output_log_path = "./datasets/DIV2K_train_need_to_short.txt"
+error_path = "./datasets/error.txt"
 
 # 处理所有文本文件
 for subdir, _, files in os.walk(root_folder):

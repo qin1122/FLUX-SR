@@ -1,10 +1,13 @@
-transformers==4.47.0
+transformers
 wandb
 torch
+tqdm
 torchvision
-accelerate==1.2.0
+opencv-python
+accelerate
 peft>=0.14.0
 datasets
 sentencepiece==0.2.0
-diffusers>=0.33.0
-bitsandbytes==0.45.5
+bitsandbytes
+git+https://github.com/huggingface/diffusers
+

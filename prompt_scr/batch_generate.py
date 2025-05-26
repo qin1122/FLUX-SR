@@ -1,3 +1,5 @@
+# coding=utf-8
+
 import openai
 import base64
 import os
@@ -9,9 +11,9 @@ base_url = "https://aihubmax.com/v1"  # 确保 base_url 正确
 client = openai.OpenAI(api_key=api_key, base_url=base_url, timeout=600)
 
 # 图片文件夹路径
-image_folder = "/Users/qinhaonan/Downloads/image_reso/DIV2K_train_missing_"
-output_folder = "/Users/qinhaonan/Downloads/image_reso/DIV2K_train_missing"
-error_path = "/Users/qinhaonan/Downloads/image_reso/DIV2K_train_errors.txt"
+image_folder = "./datasets/DIV2K_train_HR"
+output_folder = "./datasets/DIV2K_train_prompt_short"
+error_path = "./datasets/DIV2K_train_errors.txt"
 folders = [1]
 for i in folders:
     os.makedirs(output_folder+str(i)+"_result", exist_ok=True)

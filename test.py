@@ -1,3 +1,5 @@
+# coding=utf-8
+
 import torch
 from diffusers import FluxControlPipeline, FluxTransformer2DModel
 from diffusers.utils import load_image
@@ -6,6 +8,7 @@ from math_utils import *
 from PIL import Image
 from glob import glob
 import argparse
+from tqdm import tqdm
 
 
 def load_validation_set(image_dir, prompt_dir, gt_dir):
@@ -36,24 +39,22 @@ def load_validation_set(image_dir, prompt_dir, gt_dir):
     return validation_images, validation_prompts, gt_images
 
 
-def test(lora_weight_path, image_dir, prompt_dir, gt_dir, output_dir, step):
-    os.makedirs(output_dir, exist_ok=True)
+def test(lora_weight_path, image_dir, prompt_dir, gt_dir, output_dir, step, device):
+    os.makedirs(os.path.join(output_dir+"_"+str(step)), exist_ok=True)
     lora_weight_path = os.path.join(lora_weight_path+'-'+str(step))
 
     pipe = FluxControlPipeline.from_pretrained(
-        "black-forest-labs/FLUX.1-Canny-dev", torch_dtype=torch.bfloat16).to("cuda:3")
+        "black-forest-labs/FLUX.1-Canny-dev", torch_dtype=torch.bfloat16).to(device)
     pipe.load_lora_weights(lora_weight_path, adapter_name="resolution")
     pipe.set_adapters("resolution", 0.85)
 
     validation_images, validation_prompts, gt_images = load_validation_set(
         image_dir, prompt_dir, gt_dir)
 
-    accumulate_psnr = 0.0
-    accumulate_psnr_5 = 0.0
-    accumulate_ssim = 0.0
-    total_num = 0.0
-
-    for validation_image, validation_prompt, gt_image in zip(validation_images, validation_prompts, gt_images):
+    for validation_image, validation_prompt, gt_image in tqdm(zip(validation_images, validation_prompts, gt_images),
+                                                              total=len(
+                                                                  validation_images),
+                                                              desc=f"Testing step {step}"):
         base_name = os.path.splitext(os.path.basename(validation_image))[0]
         control_image = load_image(validation_image)
         HR_image = Image.open(gt_image).convert("RGB")
@@ -77,13 +78,12 @@ def test(lora_weight_path, image_dir, prompt_dir, gt_dir, output_dir, step):
                                 base_name+".png")
         image_save.save(save_dir)
 
-        psnr_5, psnr, ssim_ = calculate_psnr_ssim(image_save, HR_image)
-        accumulate_psnr += psnr
-        accumulate_psnr_5 += psnr_5
-        accumulate_ssim += ssim_
-        total_num += 1
+    print("----------Evaluating Metrics----------")
 
-    print(f"average psnr: {accumulate_psnr/total_num}, average psnr_5: {accumulate_psnr_5/total_num}, average ssim: {accumulate_ssim/total_num}")
+    predicted_dir = os.join.path(output_dir+"_"+str(step))
+    txt_dir = os.path.join(output_dir+"_"+str(step), "metrics.txt")
+
+    evaluate_metrics(gt_dir, predicted_dir, txt_dir)
 
 
 if __name__ == '__main__':
@@ -100,7 +100,8 @@ if __name__ == '__main__':
                         default=None, help='Output estimated HR image save path')
     parser.add_argument('--step', type=int, default=100,
                         help='The step of checkpoint')
+    parser.add_argument('--device', type=str, default="cuda")
     args = parser.parse_args()
 
     test(args.lora_weight_dir, args.image_dir,
-         args.prompt_dir, args.gt_dir, args.output_dir, args.step)
+         args.prompt_dir, args.gt_dir, args.output_dir, args.step, args.device)

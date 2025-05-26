@@ -1,17 +1,5 @@
 #!/usr/bin/env python
 # coding=utf-8
-# Copyright 2025 The HuggingFace Inc. team. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
 
 from glob import glob
 import json
@@ -40,7 +28,6 @@ from peft.utils import get_peft_model_state_dict
 from PIL import Image
 from torchvision import transforms
 from tqdm.auto import tqdm
-# from controlnet_aux import CannyDetector, HEDdetector
 
 import diffusers
 from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler, FluxControlPipeline, FluxTransformer2DModel
@@ -74,217 +61,6 @@ def encode_images(pixels: torch.Tensor, vae: torch.nn.Module, weight_dtype):
     pixel_latents = (pixel_latents - vae.config.shift_factor) * \
         vae.config.scaling_factor
     return pixel_latents.to(weight_dtype)
-
-
-def load_validation_set(image_dir, prompt_dir, gt_dir):
-    image_paths = sorted(glob(os.path.join(image_dir, '*')))
-    validation_images = []
-    validation_prompts = []
-    gt_images = []
-
-    for image_path in image_paths:
-        base_name = os.path.splitext(os.path.basename(image_path))[0]
-        prompt_path = os.path.join(prompt_dir, base_name + ".txt")
-        gt_path = os.path.join(gt_dir, base_name + ".png")
-
-        if not os.path.exists(prompt_path):
-            raise FileNotFoundError(
-                f"Prompt file not found for image: {image_path}")
-        if not os.path.exists(gt_path):
-            raise FileNotFoundError(
-                f"GT file not found for image: {image_path}")
-
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            prompt = f.read().strip()
-
-        validation_images.append(image_path)
-        validation_prompts.append(prompt)
-        gt_images.append(gt_path)
-
-    return validation_images, validation_prompts, gt_images
-
-
-def log_validation(flux_transformer, args, accelerator, weight_dtype, step, is_final_validation=False):
-    device = torch.device(
-        args.valid_GPU_id) if torch.cuda.is_available() else torch.device("cpu")
-    logger.info("Running validation... ")
-
-    if not is_final_validation:
-        flux_transformer = accelerator.unwrap_model(flux_transformer)
-        pipeline = FluxControlPipeline.from_pretrained(
-            args.pretrained_model_name_or_path,
-            transformer=flux_transformer,
-            torch_dtype=weight_dtype,
-        )
-    else:
-        transformer = FluxTransformer2DModel.from_pretrained(
-            args.pretrained_model_name_or_path, subfolder="transformer", torch_dtype=weight_dtype
-        )
-        initial_channels = transformer.config.in_channels
-        pipeline = FluxControlPipeline.from_pretrained(
-            args.pretrained_model_name_or_path,
-            transformer=transformer,
-            torch_dtype=weight_dtype,
-        )
-        pipeline.load_lora_weights(args.output_dir)
-        assert (
-            pipeline.transformer.config.in_channels == initial_channels * 2
-        ), f"{pipeline.transformer.config.in_channels=}"
-
-    pipeline.to(device)
-    pipeline.set_progress_bar_config(disable=True)
-
-    if args.seed is None:
-        generator = None
-    else:
-        generator = torch.Generator(
-            device=device).manual_seed(args.seed)
-
-    validation_images, validation_prompts, gt_images = load_validation_set(
-        args.validation_image, args.validation_prompt, args.gt_image)
-
-    if len(validation_images) == len(validation_prompts):
-        print("validation images and prompts are matched")
-    else:
-        raise ValueError(
-            "number of `args.validation_image` and `args.validation_prompt` should be checked in `parse_args`"
-        )
-
-    image_logs = []
-    if is_final_validation or torch.backends.mps.is_available():
-        autocast_ctx = nullcontext()
-    else:
-        autocast_ctx = torch.autocast(device.type, weight_dtype)
-
-    accumulate_ssim = 0.0
-    accumulate_psnr = 0.0
-    accumulate_psnr_5 = 0.0
-    total_nums = 0
-
-    for validation_prompt, validation_image, gt_image in zip(validation_prompts, validation_images, gt_images):
-        validation_image = load_image(validation_image)
-        gt_image = load_image(gt_image)
-        # maybe need to inference on 1024 to get a good image
-        validation_image = validation_image.resize(
-            (args.resolution, args.resolution))
-        gt_image = gt_image.resize((args.resolution, args.resolution))
-
-        images = []
-
-        for _ in range(args.num_validation_images):
-            with autocast_ctx:
-                image = pipeline(
-                    prompt=validation_prompt,
-                    control_image=validation_image,
-                    num_inference_steps=50,
-                    guidance_scale=args.guidance_scale,
-                    generator=generator,
-                    max_sequence_length=512,
-                    height=args.resolution,
-                    width=args.resolution,
-                ).images[0]
-            image = image.resize((args.resolution, args.resolution))
-            images.append(image)
-        for image in images:
-            psnr_5, psnr, ssim = calculate_psnr_ssim(image, gt_image)
-            accumulate_psnr += psnr
-            accumulate_psnr_5 += psnr_5
-            accumulate_ssim += ssim
-            total_nums += 1
-        image_logs.append(
-            {"validation_image": validation_image, "images": images,
-                "validation_prompt": validation_prompt}
-        )
-
-    tracker_key = "test" if is_final_validation else "validation"
-    for tracker in accelerator.trackers:
-        if tracker.name == "tensorboard":
-            for log in image_logs:
-                images = log["images"]
-                validation_prompt = log["validation_prompt"]
-                validation_image = log["validation_image"]
-                formatted_images = []
-                formatted_images.append(np.asarray(validation_image))
-                for image in images:
-                    formatted_images.append(np.asarray(image))
-                formatted_images = np.stack(formatted_images)
-                tracker.writer.add_images(
-                    validation_prompt, formatted_images, step, dataformats="NHWC")
-
-        elif tracker.name == "wandb":
-            formatted_images = []
-            for log in image_logs:
-                images = log["images"]
-                validation_prompt = log["validation_prompt"]
-                validation_image = log["validation_image"]
-                formatted_images.append(wandb.Image(
-                    validation_image, caption="Conditioning"))
-                for image in images:
-                    image = wandb.Image(image, caption=validation_prompt)
-                    formatted_images.append(image)
-
-            tracker.log({tracker_key: formatted_images})
-            tracker.log({
-                "validation mean psnr": accumulate_psnr / total_nums,
-                "validation mean psnr_5": accumulate_psnr_5 / total_nums,
-                "validation mean ssim": accumulate_ssim / total_nums,
-            }, step=step)
-        else:
-            logger.warning(f"image logging not implemented for {tracker.name}")
-
-        del pipeline
-        free_memory()
-        return image_logs
-
-
-def save_model_card(repo_id: str, image_logs=None, base_model=str, repo_folder=None):
-    img_str = ""
-    if image_logs is not None:
-        img_str = "You can find some example images below.\n\n"
-        for i, log in enumerate(image_logs):
-            images = log["images"]
-            validation_prompt = log["validation_prompt"]
-            validation_image = log["validation_image"]
-            validation_image.save(os.path.join(
-                repo_folder, "image_control.png"))
-            img_str += f"prompt: {validation_prompt}\n"
-            images = [validation_image] + images
-            make_image_grid(images, 1, len(images)).save(
-                os.path.join(repo_folder, f"images_{i}.png"))
-            img_str += f"![images_{i})](./images_{i}.png)\n"
-
-    model_description = f"""
-# control-lora-{repo_id}
-
-These are Control LoRA weights trained on {base_model} with new type of conditioning.
-{img_str}
-
-## License
-
-Please adhere to the licensing terms as described [here](https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/LICENSE.md)
-"""
-
-    model_card = load_or_create_model_card(
-        repo_id_or_path=repo_id,
-        from_training=True,
-        license="other",
-        base_model=base_model,
-        model_description=model_description,
-        inference=True,
-    )
-
-    tags = [
-        "flux",
-        "flux-diffusers",
-        "text-to-image",
-        "diffusers",
-        "control-lora",
-        "diffusers-training",
-        "lora",
-    ]
-    model_card = populate_model_card(model_card, tags=tags)
-
-    model_card.save(os.path.join(repo_folder, "README.md"))
 
 
 def parse_args(input_args=None):
@@ -330,7 +106,7 @@ def parse_args(input_args=None):
         type=int,
         default=1024,
         help=(
-            "The resolution for input images, all the images in the train/validation dataset will be resized to this"
+            "The resolution for input images, all the images in the train dataset will be resized to this"
             " resolution"
         ),
     )
@@ -465,8 +241,8 @@ def parse_args(input_args=None):
                         help="Epsilon value for the Adam optimizer")
     parser.add_argument("--max_grad_norm", default=1.0,
                         type=float, help="Max gradient norm.")
-    parser.add_argument("--push_to_hub", action="store_true",
-                        help="Whether or not to push the model to the Hub.")
+    # parser.add_argument("--push_to_hub", action="store_true",
+    #                     help="Whether or not to push the model to the Hub.")
     parser.add_argument("--hub_token", type=str, default=None,
                         help="The token to use to push to the Model Hub.")
     parser.add_argument(
@@ -563,53 +339,6 @@ def parse_args(input_args=None):
         ),
     )
     parser.add_argument(
-        "--validation_prompt",
-        type=str,
-        default=None,
-        help=(
-            "A set of prompts evaluated every `--validation_steps` and logged to `--report_to`."
-            " Provide either a matching number of `--validation_image`s, a single `--validation_image`"
-            " to be used with all prompts, or a single prompt that will be used with all `--validation_image`s."
-        ),
-    )
-    parser.add_argument(
-        "--validation_image",
-        type=str,
-        default=None,
-        help=(
-            "A set of paths to the control conditioning image be evaluated every `--validation_steps`"
-            " and logged to `--report_to`. Provide either a matching number of `--validation_prompt`s, a"
-            " a single `--validation_prompt` to be used with all `--validation_image`s, or a single"
-            " `--validation_image` that will be used with all `--validation_prompt`s."
-        ),
-    )
-    parser.add_argument(
-        "--gt_image",
-        type=str,
-        default=None,
-    )
-    parser.add_argument(
-        "--valid_GPU_id",
-        type=str,
-        default="cuda:3",
-    )
-    parser.add_argument(
-        "--num_validation_images",
-        type=int,
-        default=1,
-        help="Number of images to be generated for each `--validation_image`, `--validation_prompt` pair",
-    )
-    parser.add_argument(
-        "--validation_steps",
-        type=int,
-        default=1000,
-        help=(
-            "Run validation every X steps. Validation consists of running the prompt"
-            " `args.validation_prompt` multiple times: `args.num_validation_images`"
-            " and logging the images."
-        ),
-    )
-    parser.add_argument(
         "--tracker_project_name",
         type=str,
         default="flux_train_control_lora",
@@ -682,26 +411,6 @@ def parse_args(input_args=None):
     if args.proportion_empty_prompts < 0 or args.proportion_empty_prompts > 1:
         raise ValueError(
             "`--proportion_empty_prompts` must be in the range [0, 1].")
-
-    if args.validation_prompt is not None and args.validation_image is None:
-        raise ValueError(
-            "`--validation_image` must be set if `--validation_prompt` is set")
-
-    if args.validation_prompt is None and args.validation_image is not None:
-        raise ValueError(
-            "`--validation_prompt` must be set if `--validation_image` is set")
-
-    # if (
-    #     args.validation_image is not None
-    #     and args.validation_prompt is not None
-    #     and len(args.validation_image) != 1
-    #     and len(args.validation_prompt) != 1
-    #     and len(args.validation_image) != len(args.validation_prompt)
-    # ):
-    #     raise ValueError(
-    #         "Must provide either 1 `--validation_image`, 1 `--validation_prompt`,"
-    #         " or the same number of `--validation_prompt`s and `--validation_image`s"
-    #     )
 
     if args.resolution % 8 != 0:
         raise ValueError(
@@ -786,9 +495,6 @@ def prepare_train_dataset(args, dataset, accelerator):
         ]
     )
 
-    # processor = CannyDetector()
-    # processor1 = HEDdetector.from_pretrained("lllyasviel/Annotators")
-
     def preprocess_train(examples):
         images = [
             (image.convert("RGB") if not isinstance(image, str)
@@ -802,13 +508,6 @@ def prepare_train_dataset(args, dataset, accelerator):
              else Image.open(image).convert("RGB"))
             for image in examples[args.conditioning_image_column]
         ]
-
-        # use canny detection results
-        # conditioning_images = [processor(image, low_threshold=50,
-        #                                  high_threshold=200, detect_resolution=image.size[0], image_resolution=args.resolution) for image in conditioning_images]
-        # using hed detector results
-        # conditioning_images = [processor1(image)
-        #                        for image in conditioning_images]
         conditioning_images = [image_transforms(
             image) for image in conditioning_images]
 
@@ -900,10 +599,10 @@ def main(args):
         if args.output_dir is not None:
             os.makedirs(args.output_dir, exist_ok=True)
 
-        if args.push_to_hub:
-            repo_id = create_repo(
-                repo_id=args.hub_model_id or Path(args.output_dir).name, exist_ok=True, token=args.hub_token
-            ).repo_id
+        # if args.push_to_hub:
+        #     repo_id = create_repo(
+        #         repo_id=args.hub_model_id or Path(args.output_dir).name, exist_ok=True, token=args.hub_token
+        #     ).repo_id
 
     # Load models. We will load the text encoders later in a pipeline to compute
     # embeddings.
@@ -1229,10 +928,6 @@ def main(args):
     if accelerator.is_main_process:
         tracker_config = dict(vars(args))
 
-        # tensorboard cannot handle list types for config
-        tracker_config.pop("validation_prompt")
-        tracker_config.pop("validation_image")
-
         accelerator.init_trackers(
             args.tracker_project_name, config=tracker_config)
 
@@ -1508,14 +1203,14 @@ def main(args):
                         accelerator.save_state(save_path)
                         logger.info(f"Saved state to {save_path}")
 
-                    if args.validation_prompt is not None and global_step % args.validation_steps == 0:
-                        image_logs = log_validation(
-                            flux_transformer=flux_transformer,
-                            args=args,
-                            accelerator=accelerator,
-                            weight_dtype=weight_dtype,
-                            step=global_step,
-                        )
+                    # if args.validation_prompt is not None and global_step % args.validation_steps == 0:
+                    #     image_logs = log_validation(
+                    #         flux_transformer=flux_transformer,
+                    #         args=args,
+                    #         accelerator=accelerator,
+                    #         weight_dtype=weight_dtype,
+                    #         step=global_step,
+                    #     )
 
             logs = {"loss": loss.detach().item(
             ), "lr": lr_scheduler.get_last_lr()[0]}
@@ -1551,34 +1246,6 @@ def main(args):
         del text_encoding_pipeline
         del vae
         free_memory()
-
-        # Run a final round of validation.
-        # 暂时不做这一步，资源不支持
-        image_logs = None
-        if args.validation_steps <= args.max_train_steps:
-            if args.validation_prompt is not None:
-                image_logs = log_validation(
-                    flux_transformer=None,
-                    args=args,
-                    accelerator=accelerator,
-                    weight_dtype=weight_dtype,
-                    step=global_step,
-                    is_final_validation=True,
-                )
-
-        if args.push_to_hub:
-            save_model_card(
-                repo_id,
-                image_logs=image_logs,
-                base_model=args.pretrained_model_name_or_path,
-                repo_folder=args.output_dir,
-            )
-            upload_folder(
-                repo_id=repo_id,
-                folder_path=args.output_dir,
-                commit_message="End of training",
-                ignore_patterns=["step_*", "epoch_*", "*.pt", "*.bin"],
-            )
 
     accelerator.end_training()
 
