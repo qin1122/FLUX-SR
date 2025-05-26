@@ -32,12 +32,13 @@ Our datasets are build based on [DIV2K](https://data.vision.ee.ethz.ch/cvl/DIV2K
 Our preprocessed datasets can be downloaded [here](https://box.nju.edu.cn/d/b2895e81670b436c88d8/), download the dataset you need and place it in the ./datasets folder.
 
 > datasets folder structure is as follows: 
+>
 > datasets/  -- Preprocessed datasets
 > 
-> datasets/DIV2K_train_HR -- 0001.png, 0002.png, ..., 0800.png, train HR images
-> datasets/DIV2K_train_LR_x4 -- train LR images, downscale factor x4
-> datasets/DIV2K_train_LR_x8 -- train LR images, downscale factor x8
-> datasets/DIV2K_train_LR_x16 -- train LR images, downscale factor x16
+> datasets/DIV2K_train_HR -- 0001.png, 0002.png, ..., 0800.png, train HR images \\
+> datasets/DIV2K_train_LR_x4 -- train LR images, downscale factor x4\\
+> datasets/DIV2K_train_LR_x8 -- train LR images, downscale factor x8\\
+> datasets/DIV2K_train_LR_x16 -- train LR images, downscale factor x16\\
 > datasets/DIV2K_train_prompt_short -- 0001.txt, 0002.txt, ..., 0800.txt, prompts for train images
 > datasets/DIV2K_train_dataset_x4_withprompt -- hf dataset, including train HR images, train LR images downscale factor x4 and prompts.
 > datasets/DIV2K_train_dataset_x4_withoutprompt -- hf dataset, including train HR images, train LR images downscale factor x4.
@@ -103,7 +104,7 @@ python ./prompt_scr/shorten.py
 ```
 > to shorten the prompts. 
 >
-> **You may need to repeat the above process several times to obtain a prompt that meets the length limitation.**
+**You may need to repeat the above process several times to obtain a prompt that meets the length limitation.**
 
 To build a hf dataset for training, run
 ```bash
