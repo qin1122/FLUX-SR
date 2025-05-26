@@ -35,13 +35,13 @@ Our preprocessed datasets can be downloaded [here](https://box.nju.edu.cn/d/b289
 >
 > datasets/  -- Preprocessed datasets
 > 
-> datasets/DIV2K_train_HR -- 0001.png, 0002.png, ..., 0800.png, train HR images \\
-> datasets/DIV2K_train_LR_x4 -- train LR images, downscale factor x4\\
-> datasets/DIV2K_train_LR_x8 -- train LR images, downscale factor x8\\
-> datasets/DIV2K_train_LR_x16 -- train LR images, downscale factor x16\\
-> datasets/DIV2K_train_prompt_short -- 0001.txt, 0002.txt, ..., 0800.txt, prompts for train images
-> datasets/DIV2K_train_dataset_x4_withprompt -- hf dataset, including train HR images, train LR images downscale factor x4 and prompts.
-> datasets/DIV2K_train_dataset_x4_withoutprompt -- hf dataset, including train HR images, train LR images downscale factor x4.
+> datasets/DIV2K_train_HR -- 0001.png, 0002.png, ..., 0800.png, train HR images \
+> datasets/DIV2K_train_LR_x4 -- train LR images, downscale factor x4 \
+> datasets/DIV2K_train_LR_x8 -- train LR images, downscale factor x8 \
+> datasets/DIV2K_train_LR_x16 -- train LR images, downscale factor x16 \
+> datasets/DIV2K_train_prompt_short -- 0001.txt, 0002.txt, ..., 0800.txt, prompts for train images \
+> datasets/DIV2K_train_dataset_x4_withprompt -- hf dataset, including train HR images, train LR images downscale factor x4 and prompts. \
+> datasets/DIV2K_train_dataset_x4_withoutprompt -- hf dataset, including train HR images, train LR images downscale factor x4. \
 > datasets/DIV2K_train_dataset_x8_withprompt -- hf dataset, including train HR images, train LR images downscale factor x8 and prompts.
 > datasets/DIV2K_train_dataset_x8_withoutprompt -- hf dataset, including train HR images, train LR images downscale factor x8.
 > datasets/DIV2K_train_dataset_x16_withprompt -- hf dataset, including train HR images, train LR images downscale factor x16 and prompts.
