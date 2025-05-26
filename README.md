@@ -45,13 +45,13 @@ Our preprocessed datasets can be downloaded [here](https://box.nju.edu.cn/d/b289
 > datasets/DIV2K_train_dataset_x8_withprompt -- hf dataset, including train HR images, train LR images downscale factor x8 and prompts. \
 > datasets/DIV2K_train_dataset_x8_withoutprompt -- hf dataset, including train HR images, train LR images downscale factor x8. \
 > datasets/DIV2K_train_dataset_x16_withprompt -- hf dataset, including train HR images, train LR images downscale factor x16 and prompts. \
-> datasets/DIV2K_train_dataset_x16_withoutprompt -- hf dataset, including train HR images, train LR images downscale factor x16. \
+> datasets/DIV2K_train_dataset_x16_withoutprompt -- hf dataset, including train HR images, train LR images downscale factor x16.
 >
 > datasets/DIV2K_valid_HR -- 0801.png, 0802.png, ..., 0900.png, valid HR images \
 > datasets/DIV2K_valid_LR_x4 -- valid LR images, downscale factor x4 \
 > datasets/DIV2K_valid_LR_x8 -- valid LR images, downscale factor x8 \
 > datasets/DIV2K_valid_LR_x16 -- valid LR images, downscale factor x16 \
-> datasets/DIV2K_valid_prompt_short -- 0801.txt, 0802.txt, ..., 0900.txt, prompts for valid images \
+> datasets/DIV2K_valid_prompt_short -- 0801.txt, 0802.txt, ..., 0900.txt, prompts for valid images
 
 ## 🏰 Model Zoo
 
